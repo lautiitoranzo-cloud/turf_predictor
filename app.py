@@ -32,7 +32,8 @@ tabs = st.tabs([
     "🔮 Predicción y apuestas",
     "✅ Cargar resultado",
     "📈 Aprendizaje del modelo",
-    "📂 Historial"
+    "📂 Historial",
+    "🎯 Rendimiento"
 ])
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -407,3 +408,117 @@ with tabs[4]:
                     if st.button("🗑️ Borrar carrera", key=f"del_{carrera['id']}"):
                         st.session_state[confirm_key] = True
                         st.rerun()
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 6 — RENDIMIENTO
+# ════════════════════════════════════════════════════════════════════════════════
+with tabs[5]:
+    st.header("Rendimiento del modelo")
+    st.caption("Solo se cuentan carreras donde el modelo generó una predicción y se cargó el resultado real.")
+
+    carreras = obtener_todas_carreras()
+
+    total = 0
+    acierto_1 = 0
+    acierto_top2 = 0
+    acierto_top3 = 0
+    acierto_alguno_exacto = 0
+    detalle = []
+
+    for carrera in carreras:
+        predicciones = obtener_predicciones_de_carrera(carrera["id"])
+        # Solo carreras con prediccion y resultado cargado
+        if not predicciones:
+            continue
+        if not any(p["posicion_final"] for p in predicciones):
+            continue
+
+        total += 1
+
+        # Ordenar predicciones por probabilidad
+        preds_sorted = sorted(predicciones, key=lambda x: x["probabilidad"], reverse=True)
+
+        # Ganador real = el que tiene posicion_final == 1
+        ganador_real = next((p for p in predicciones if p["posicion_final"] == 1), None)
+        if not ganador_real:
+            continue
+
+        ganador_nombre = ganador_real["nombre"]
+        ganador_num = ganador_real["numero_cuerpo"]
+
+        # Posicion que le dio el modelo al ganador real
+        pos_predicha = next((i+1 for i, p in enumerate(preds_sorted) if p["numero_cuerpo"] == ganador_num), None)
+
+        acierto_gan = pos_predicha == 1
+        acierto_t2  = pos_predicha <= 2 if pos_predicha else False
+        acierto_t3  = pos_predicha <= 3 if pos_predicha else False
+
+        # Algun caballo en posicion exacta
+        alguno_exacto = any(
+            p["posicion_final"] == (i+1)
+            for i, p in enumerate(preds_sorted)
+            if p["posicion_final"]
+        )
+
+        if acierto_gan: acierto_1 += 1
+        if acierto_t2:  acierto_top2 += 1
+        if acierto_t3:  acierto_top3 += 1
+        if alguno_exacto: acierto_alguno_exacto += 1
+
+        detalle.append({
+            "Carrera": f"{carrera['hipodromo']} {carrera['distancia']}m",
+            "Fecha": carrera["fecha"],
+            "Ganador real": ganador_nombre,
+            "Pos. predicha": f"{pos_predicha}°" if pos_predicha else "—",
+            "Ganador exacto": "✅" if acierto_gan else "❌",
+            "Top 2": "✅" if acierto_t2 else "❌",
+            "Top 3": "✅" if acierto_t3 else "❌",
+            "Alguno exacto": "✅" if alguno_exacto else "❌",
+        })
+
+    if total == 0:
+        st.info("Todavía no hay carreras con predicción y resultado cargado.")
+    else:
+        pct = lambda n: f"{n/total*100:.1f}%"
+
+        # Métricas principales
+        st.subheader("Resumen global")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.metric("Carreras analizadas", total)
+        with c2:
+            st.metric("Ganador exacto (1°)", f"{acierto_1}/{total}", pct(acierto_1))
+        with c3:
+            st.metric("Ganador en top 2", f"{acierto_top2}/{total}", pct(acierto_top2))
+        with c4:
+            st.metric("Ganador en top 3", f"{acierto_top3}/{total}", pct(acierto_top3))
+
+        st.divider()
+
+        c5, c6 = st.columns(2)
+        with c5:
+            st.metric("Al menos 1 posición exacta", f"{acierto_alguno_exacto}/{total}", pct(acierto_alguno_exacto))
+        with c6:
+            st.caption("")
+            st.caption("Una posición exacta = algún caballo quedó exactamente donde el modelo predijo.")
+
+        st.divider()
+
+        # Grafico de barras simple
+        st.subheader("Comparativa visual")
+        df_barras = pd.DataFrame({
+            "Métrica": ["Ganador exacto", "Ganador en top 2", "Ganador en top 3", "Alguna pos. exacta"],
+            "Aciertos (%)": [
+                round(acierto_1/total*100, 1),
+                round(acierto_top2/total*100, 1),
+                round(acierto_top3/total*100, 1),
+                round(acierto_alguno_exacto/total*100, 1),
+            ]
+        })
+        st.bar_chart(df_barras.set_index("Métrica"))
+
+        st.divider()
+
+        # Detalle carrera por carrera
+        st.subheader("Detalle por carrera")
+        st.dataframe(pd.DataFrame(detalle), use_container_width=True, hide_index=True)
