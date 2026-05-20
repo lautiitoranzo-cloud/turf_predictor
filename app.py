@@ -63,6 +63,10 @@ with tabs[0]:
         carrera_id = st.session_state["carrera_id_activa"]
         carrera = obtener_carrera(carrera_id)
 
+        if carrera is None:
+            st.session_state.pop("carrera_id_activa", None)
+            st.rerun()
+
         st.divider()
         st.subheader(f"Caballos — {carrera['hipodromo']} · {carrera['distancia']}m · {carrera['condicion_pista']}")
 
