@@ -78,7 +78,7 @@ with tabs[0]:
         todas_carreras = obtener_todas_carreras()
         carreras_ant = [c for c in todas_carreras if c["id"] != carrera_id]
         if carreras_ant:
-            with st.expander("📖 Consultar caballos de carreras anteriores (para copiar datos)"):
+            with st.expander("📖 Consultar caballos de carreras anteriores"):
                 opciones_ref = {f"#{c['id']} — {c['hipodromo']} {c['distancia']}m {c['fecha']}": c["id"] for c in carreras_ant}
                 sel_ref = st.selectbox("Carrera de referencia", list(opciones_ref.keys()), key="ref_sel")
                 caballos_ref = obtener_caballos_de_carrera(opciones_ref[sel_ref])
@@ -98,112 +98,57 @@ with tabs[0]:
                             fila[f"D{j}"] = 1200
                         filas_ref.append(fila)
                     st.dataframe(pd.DataFrame(filas_ref), use_container_width=True, hide_index=True)
-                    st.caption("Solo lectura. Usá esta tabla como referencia mientras completás la planilla de abajo.")
 
-        st.markdown("#### Planilla de carga")
-        st.caption("Editá la tabla y apretá **Guardar** cuando terminés. VR = 0 = sin dato. Actuaciones de más reciente (1) a más antigua (5).")
+        # ── FORMULARIO UN CABALLO POR VEZ ─────────────────────────────────────
+        st.markdown("#### Agregar caballo")
+        st.caption("Completá los datos y apretá **Agregar** — se guarda directo en la base de datos. Repetí para cada caballo.")
 
-        dist_default = carrera["distancia"]
+        with st.form(key=f"form_caballo_{carrera_id}_{len(caballos_guardados)}", clear_on_submit=True):
+            fc1, fc2, fc3 = st.columns(3)
+            with fc1:
+                f_num = st.number_input("N° cuerpo", min_value=1, max_value=20, value=len(caballos_guardados)+1, step=1)
+            with fc2:
+                f_nombre = st.text_input("Nombre *", placeholder="Nombre del caballo")
+            with fc3:
+                f_ritmo = st.selectbox("Ritmo", RITMOS)
 
-        def fila_vacia(n):
-            return {
-                "#": n, "Nombre": "", "Ritmo": "front",
-                "VR1": 0.0, "P1": 1, "C1": 0.0, "D1": dist_default,
-                "VR2": 0.0, "P2": 1, "C2": 0.0, "D2": dist_default,
-                "VR3": 0.0, "P3": 1, "C3": 0.0, "D3": dist_default,
-                "VR4": 0.0, "P4": 1, "C4": 0.0, "D4": dist_default,
-                "VR5": 0.0, "P5": 1, "C5": 0.0, "D5": dist_default,
-            }
+            st.markdown("**Últimas actuaciones** — de más reciente (1) a más antigua (5). VR = 0 si no hay dato.")
 
-        key_df = f"df_{carrera_id}"
-        n_caballos = st.number_input("Cantidad de caballos", min_value=2, max_value=20, value=8, step=1, key=f"n_{carrera_id}")
+            acts = []
+            for j in range(1, 6):
+                ac1, ac2, ac3, ac4 = st.columns(4)
+                with ac1:
+                    vr = st.number_input(f"VR{j}", min_value=0.0, max_value=200.0, value=0.0, step=0.1, format="%.1f", key=f"f_vr{j}")
+                with ac2:
+                    pos = st.number_input(f"P{j}", min_value=1, max_value=20, value=1, step=1, key=f"f_pos{j}")
+                with ac3:
+                    cuerpos = st.number_input(f"C{j}", min_value=0.0, max_value=50.0, value=0.0, step=0.5, format="%.1f", key=f"f_c{j}")
+                with ac4:
+                    dist_idx = DISTANCIAS.index(carrera["distancia"]) if carrera["distancia"] in DISTANCIAS else 5
+                    dist = st.selectbox(f"D{j}", DISTANCIAS, index=dist_idx, key=f"f_d{j}")
+                acts.append((vr, pos, cuerpos, dist))
 
-        if key_df not in st.session_state or len(st.session_state[key_df]) != n_caballos:
-            st.session_state[key_df] = pd.DataFrame([fila_vacia(i+1) for i in range(n_caballos)])
+            agregar = st.form_submit_button("➕ Agregar caballo", type="primary")
 
-        col_config = {
-            "#":      st.column_config.NumberColumn("#", min_value=1, max_value=20, step=1, width="small"),
-            "Nombre": st.column_config.TextColumn("Nombre", width="medium"),
-            "Ritmo":  st.column_config.SelectboxColumn("Ritmo", options=RITMOS, width="small"),
-            "VR1": st.column_config.NumberColumn("VR1", format="%.1f", width="small"),
-            "P1":  st.column_config.NumberColumn("P1",  min_value=1, max_value=20, step=1, width="small"),
-            "C1":  st.column_config.NumberColumn("C1",  format="%.1f", width="small"),
-            "D1":  st.column_config.SelectboxColumn("D1", options=DISTANCIAS, width="small"),
-            "VR2": st.column_config.NumberColumn("VR2", format="%.1f", width="small"),
-            "P2":  st.column_config.NumberColumn("P2",  min_value=1, max_value=20, step=1, width="small"),
-            "C2":  st.column_config.NumberColumn("C2",  format="%.1f", width="small"),
-            "D2":  st.column_config.SelectboxColumn("D2", options=DISTANCIAS, width="small"),
-            "VR3": st.column_config.NumberColumn("VR3", format="%.1f", width="small"),
-            "P3":  st.column_config.NumberColumn("P3",  min_value=1, max_value=20, step=1, width="small"),
-            "C3":  st.column_config.NumberColumn("C3",  format="%.1f", width="small"),
-            "D3":  st.column_config.SelectboxColumn("D3", options=DISTANCIAS, width="small"),
-            "VR4": st.column_config.NumberColumn("VR4", format="%.1f", width="small"),
-            "P4":  st.column_config.NumberColumn("P4",  min_value=1, max_value=20, step=1, width="small"),
-            "C4":  st.column_config.NumberColumn("C4",  format="%.1f", width="small"),
-            "D4":  st.column_config.SelectboxColumn("D4", options=DISTANCIAS, width="small"),
-            "VR5": st.column_config.NumberColumn("VR5", format="%.1f", width="small"),
-            "P5":  st.column_config.NumberColumn("P5",  min_value=1, max_value=20, step=1, width="small"),
-            "C5":  st.column_config.NumberColumn("C5",  format="%.1f", width="small"),
-            "D5":  st.column_config.SelectboxColumn("D5", options=DISTANCIAS, width="small"),
-        }
-
-        edited = st.data_editor(
-                st.session_state[key_df],
-                use_container_width=True,
-                hide_index=True,
-                num_rows="fixed",
-                column_config=col_config,
-                key=f"editor_{carrera_id}",
-                on_change=None,
-            )
-
-        submitted = st.button("💾 Guardar todos los caballos", type="primary")
-
-        if submitted:
-            edited = st.session_state.get(f"editor_{carrera_id}", {})
-            if edited and "edited_rows" in edited:
-                df = st.session_state[key_df].copy()
-                for idx, changes in edited["edited_rows"].items():
-                    for col, val in changes.items():
-                        df.at[int(idx), col] = val
-                edited = df
+        if agregar:
+            if not f_nombre.strip():
+                st.error("Ingresá el nombre del caballo.")
             else:
-                edited = st.session_state[key_df]
-            errores = []
-            guardados = 0
-            for _, row in edited.iterrows():
-                nombre = str(row["Nombre"]).strip()
-                if not nombre:
-                    continue
                 historial = []
-                for j in range(1, 6):
-                    vr = row[f"VR{j}"]
-                    try:
-                        vr_val = float(vr) if vr is not None and str(vr) != "nan" else 0.0
-                    except (ValueError, TypeError):
-                        vr_val = 0.0
-                    if vr_val > 0:
-                        try:
-                            historial.append({
-                                "vr":        vr_val,
-                                "posicion":  int(float(row[f"P{j}"])) if str(row[f"P{j}"]) != "nan" else 1,
-                                "cuerpos":   float(row[f"C{j}"]) if str(row[f"C{j}"]) != "nan" else 0.0,
-                                "distancia": int(float(row[f"D{j}"])) if str(row[f"D{j}"]) != "nan" else 1200,
-                            })
-                        except (ValueError, TypeError):
-                            pass
+                for vr, pos, cuerpos, dist in acts:
+                    if float(vr) > 0:
+                        historial.append({
+                            "vr": float(vr),
+                            "posicion": int(pos),
+                            "cuerpos": float(cuerpos),
+                            "distancia": int(dist),
+                        })
                 if not historial:
-                    errores.append(f"{nombre}: al menos 1 VR mayor a 0.")
-                    continue
-                insertar_caballo(carrera_id, int(row["#"]), nombre, historial, str(row["Ritmo"]))
-                guardados += 1
-
-            if guardados:
-                st.success(f"✅ {guardados} caballo(s) guardado(s).")
-                del st.session_state[key_df]
-                st.rerun()
-            for e in errores:
-                st.error(e)
+                    st.error("Ingresá al menos 1 VR mayor a 0.")
+                else:
+                    insertar_caballo(carrera_id, int(f_num), f_nombre.strip(), historial, f_ritmo)
+                    st.success(f"✅ {f_nombre.strip()} agregado correctamente.")
+                    st.rerun()
 
 # ════════════════════════════════════════════════════════════════════════════════
 # TAB 2 — PREDICCION Y APUESTAS
