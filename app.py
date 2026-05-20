@@ -147,8 +147,7 @@ with tabs[0]:
             "D5":  st.column_config.SelectboxColumn("D5", options=DISTANCIAS, width="small"),
         }
 
-        with st.form(key=f"form_{carrera_id}"):
-            edited = st.data_editor(
+        edited = st.data_editor(
                 st.session_state[key_df],
                 use_container_width=True,
                 hide_index=True,
@@ -156,10 +155,10 @@ with tabs[0]:
                 column_config=col_config,
                 key=f"editor_{carrera_id}",
             )
-            submitted = st.form_submit_button("💾 Guardar todos los caballos", type="primary")
+        st.session_state[key_df] = edited
+        submitted = st.button("💾 Guardar todos los caballos", type="primary")
 
         if submitted:
-            st.session_state[key_df] = edited
             errores = []
             guardados = 0
             for _, row in edited.iterrows():
