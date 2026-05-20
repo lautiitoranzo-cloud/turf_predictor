@@ -154,11 +154,21 @@ with tabs[0]:
                 num_rows="fixed",
                 column_config=col_config,
                 key=f"editor_{carrera_id}",
+                on_change=None,
             )
-        st.session_state[key_df] = edited
+
         submitted = st.button("💾 Guardar todos los caballos", type="primary")
 
         if submitted:
+            edited = st.session_state.get(f"editor_{carrera_id}", {})
+            if edited and "edited_rows" in edited:
+                df = st.session_state[key_df].copy()
+                for idx, changes in edited["edited_rows"].items():
+                    for col, val in changes.items():
+                        df.at[int(idx), col] = val
+                edited = df
+            else:
+                edited = st.session_state[key_df]
             errores = []
             guardados = 0
             for _, row in edited.iterrows():
